@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#1f7a5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Khudi">
+<title>Khudi — Mera Coach</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="login" class="hide">
+  <div class="logo">🌱</div><h2 id="lname"></h2><p class="note">Password daalo</p>
+  <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+  <p id="lerr" class="note" style="color:var(--warn);min-height:20px"></p>
+  <button class="btn" id="lbtn" style="width:100%">Enter</button>
+</div>
+
+<main id="app" class="hide">
+  <div class="top"><div class="brand"><div class="logo">🌱</div><div><b id="appName"></b><span id="tagline"></span></div></div><button class="lnk" id="out">Logout</button></div>
+
+  <section id="v-home">
+    <div class="card hero">
+      <div class="ring"><svg width="170" height="170" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="8"/><circle id="arc" cx="60" cy="60" r="54" fill="none" stroke="#e6bd55" stroke-width="8" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3" style="transition:stroke-dashoffset .8s"/></svg>
+        <div class="num"><b id="days">0</b><span id="dayLbl">din</span></div></div>
+      <div id="next" style="font-size:13px;opacity:.85"></div>
+      <p class="quote" id="quote"></p>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><button class="btn light" id="startS">Streak shuru karo</button><button class="btn light hide" id="reset">Naya aghaaz</button></div>
+    </div>
+    <button class="btn sos" id="urge">⚠️ Abhi urge aa rahi hai</button>
+    <div class="card" style="margin-top:14px"><h2>Milestones</h2><div class="badges" id="badges"></div></div>
+    <div class="card"><h2>Mere asbaab (triggers)</h2><p class="note">Kab aur kyun urge aati hai? Plan B bhi likho.</p><textarea id="trig" rows="3" placeholder="Raat ko akelay, bore hona… Plan B: bahar chalna"></textarea></div>
+  </section>
+
+  <section id="v-coach" class="hide">
+    <div class="chips" id="chips"></div>
+    <div class="chat" id="msgs"></div>
+    <div class="compose"><textarea id="inp" rows="1" placeholder="Apne dil ki baat likho…"></textarea><button class="btn" id="send">Send</button></div>
+    <div style="text-align:center;margin-top:10px"><button class="lnk" id="clear">Chat saaf karo</button></div>
+  </section>
+
+  <section id="v-khudi" class="hide">
+    <div class="card"><h2>Main kaun banna chahta hoon?</h2><p class="note">Ek jumla jo tumhari pehchan ho. Coach isay yaad rakhta hai.</p><textarea id="ident" rows="3" placeholder="Main woh insaan hoon jo…"></textarea></div>
+    <div class="card"><h2>Aaj ka muhasiba</h2><p class="note" id="q"></p><textarea id="ans" rows="4" placeholder="Likho…"></textarea>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn" id="saveJ">Save</button><button class="btn ghost" id="refl">Coach se feedback</button></div></div>
+    <div class="card"><h2>Purane notes</h2><div id="jl"></div></div>
+  </section>
+</main>
+
+<nav id="nav" class="hide"><button data-t="home" class="on"><i>🏠</i>Aaj</button><button data-t="coach"><i>💬</i>Coach</button><button data-t="khudi"><i>🧭</i>Khudi</button></nav>
+
+<div id="sos" class="hide">
+  <div class="note" style="color:#fff;opacity:.8">Saans andar… saans bahar… yeh guzar jayega.</div>
+  <div class="breath">saans</div><div id="clock">10:00</div>
+  <ol id="steps"></ol>
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn light" id="sosAI">Coach se baat karo</button><button class="btn" id="sosOk">Main theek hoon ✓</button></div>
+</div>
+
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
