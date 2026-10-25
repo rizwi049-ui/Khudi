@@ -1,42 +1,44 @@
-// ✏️ EDIT HERE: names, texts, daily questions, quotes. No coding needed.
+// EDIT HERE: names, texts, daily questions, quotes. No coding needed.
+// Emojis are used only inside the chat (greeting + AI replies).
 const CONFIG = {
   appName: "Saathi",
-  tagline: "Tera AI dost 🤗",
-  greeting: "Heyyy! 🥳 Main Saathi hoon, tumhara AI dost! 😊 Kuch bhi poocho: kaam, padhai, motivation, ya dil ki baat. Aaj kaisa feel ho raha hai? 🌈",
+  tagline: "Your AI friend",
+  greeting: "Hey! I'm Saathi, your AI friend 😊 Ask me anything: work, studies, motivation, or whatever is on your mind. How are you feeling today? 🌈",
   milestones: [1, 3, 7, 14, 21, 30, 60, 90, 180, 365],
   quotes: [
-    "Tum apni aadaton se bade ho! 💪 Aaj ek faisla apni marzi se karo.",
-    "Urge ek lehar hai 🌊 aati hai, charhti hai, utar jaati hai.",
-    "Khudi ka matlab: main khud ka malik hoon! 👑",
-    "Aaj ka sabr, kal ki izzat banta hai ✨",
-    "Girna failure nahi, na uthna failure hai 🌱",
-    "Chhote qadam, roz roz 🐢➡️🚀",
-    "Jo waqt bachta hai use apni pehchan banane mein lagao 🌟"
+    "You are bigger than your habits. Make one decision today on your own terms.",
+    "An urge is a wave. It rises, peaks and fades away.",
+    "Khudi means: I am the master of myself.",
+    "Today's patience becomes tomorrow's self-respect.",
+    "Falling is not failure. Not getting up is.",
+    "Small steps, every single day.",
+    "Spend your spare time building who you are."
   ],
+  // label = button text (English), title = name of the chat it opens, q = message sent to the AI
   quick: [
-    { label: "💪 Motivation do", q: "Mujhe abhi motivation chahiye!" },
-    { label: "📅 Aaj ka plan", q: "Mere pending kaam dekh kar aaj ka plan banao." },
-    { label: "🧭 Meri pehchan", q: "Mujhe apni pehchan (khudi) samajhne mein madad karo." },
-    { label: "🌙 Raat ka plan", q: "Raat ko akela hone par urge aati hai. Mujhe ek plan banao." },
-    { label: "😄 Mazedaar baat", q: "Mujhe ek mazedaar baat ya challenge do!" }
+    { label: "Motivation", title: "Motivation", q: "Mujhe abhi motivation chahiye!" },
+    { label: "Today's plan", title: "Today's plan", q: "Mere pending kaam dekh kar aaj ka plan banao." },
+    { label: "My identity", title: "My identity", q: "Mujhe apni pehchan (khudi) samajhne mein madad karo." },
+    { label: "Night plan", title: "Night plan", q: "Raat ko akela hone par urge aati hai. Mujhe ek plan banao." },
+    { label: "Fun challenge", title: "Fun challenge", q: "Mujhe ek mazedaar baat ya challenge do!" }
   ],
   urgeSteps: [
-    "📱 Phone/laptop chhodo aur kamra badlo.",
-    "🚿 Wudu karo ya thanda paani peeo.",
-    "🏃 20 push-ups ya 5 minute tez chalna.",
-    "🤲 Dua ya zikr karo, kisi apne ko message karo.",
-    "🌊 Urge 10–15 minute mein utar jaati hai. Bas intezar karo!"
+    "Put the phone/laptop down and change rooms.",
+    "Make wudu or drink cold water.",
+    "Do 20 push-ups or walk fast for 5 minutes.",
+    "Make dua or dhikr, or message someone close to you.",
+    "The urge fades in 10-15 minutes. Just wait it out."
   ],
   // Daily question: one area per day, rotating in this order
   areas: [
-    { name: "Nafs par control", emoji: "💪", q: "Aaj porn/masturbation se bachne mein tum khud ko kitne number doge?" },
-    { name: "Kaam / Padhai", emoji: "📚", q: "Aaj apne kaam ya padhai mein tum khud ko kitne number doge?" },
-    { name: "Khud ki pehchan", emoji: "🧭", q: "Aaj tum apni khudi (khud ki pehchan) mein kitne number ke haqdar ho?" },
-    { name: "Nafs par control", emoji: "💪", q: "Pichle 24 ghante mein apni aadat par control kitna raha? Number do!" },
-    { name: "Sehat", emoji: "🏃", q: "Aaj neend, khana aur exercise mein tum khud ko kitne number doge?" },
-    { name: "Mood", emoji: "😊", q: "Aaj tumhara mood aur andar ka sukoon kitne number ka hai?" },
-    { name: "Nafs par control", emoji: "💪", q: "Aaj ke din tum apni khwahishon ke malik rahe? Khud ko number do!" },
-    { name: "Sukoon / Ibadat", emoji: "🤲", q: "Aaj dil ke sukoon aur ibadat/dua mein tum khud ko kitne number doge?" },
-    { name: "Waqt ka istemal", emoji: "⏰", q: "Aaj waqt sahi jagah lagane mein tum khud ko kitne number doge?" }
+    { name: "Self-control", q: "How many points would you give yourself today for staying away from porn and masturbation?" },
+    { name: "Work / Study", q: "How many points would you give yourself today for your work or studies?" },
+    { name: "Self-identity", q: "How would you rate yourself today on knowing and staying true to yourself (khudi)?" },
+    { name: "Self-control", q: "How much control did you have over your habit in the last 24 hours? Give a number." },
+    { name: "Health", q: "How would you rate your sleep, food and exercise today?" },
+    { name: "Mood", q: "How would you rate your mood and inner peace today?" },
+    { name: "Self-control", q: "Were you the master of your desires today? Give yourself a number." },
+    { name: "Peace / Worship", q: "How would you rate your inner peace and prayer / worship today?" },
+    { name: "Time use", q: "How well did you use your time today?" }
   ]
 };
