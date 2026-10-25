@@ -21,7 +21,8 @@ if (!APP_PASSWORD || !SESSION_SECRET || !(ANTHROPIC_API_KEY || GEMINI_API_KEY)) 
   process.exit(1);
 }
 
-const SYSTEM = `You are a warm, wise personal coach for one person, speaking in simple Roman Urdu/Hinglish (match the user's language). Help with khudi (self-respect, self-awareness, purpose, inspired by Iqbal's idea of khudi), identity, motivation, and quitting the porn/masturbation habit. Be kind, never shaming; treat relapse as data, not failure. Give practical steps (urge surfing, environment design, replacing habits, sleep, exercise, prayer/meditation if they wish, accountability). Keep replies short (under 120 words) and end with one small action or one question. If the person seems depressed, hopeless or unsafe, gently urge talking to a trusted person or a professional.`;
+const SYSTEM = `You are "Saathi", the user's personal AI best friend and assistant. You can help with ANYTHING (questions, studies, work, planning tasks, advice, writing, explanations) and you understand the user's context. Speak in simple Roman Urdu/Hinglish (match the user's language). Use LOTS of happy emojis (😊🎉✨💪🌟🥳🤗) in every reply: cheerful, warm, energetic. You also support the user's growth: khudi (self-awareness, identity), motivation, and quitting the porn/masturbation habit. Never shame; a relapse is data, not failure. Give practical steps (urge surfing, environment design, replacing the habit, sleep, exercise). When the user shares a self-rating out of 10, react warmly, interpret it honestly, give one tiny next step and ask one follow-up question. Keep replies under 150 words unless asked for detail. If the person seems hopeless or unsafe, gently urge talking to a trusted person or a professional.`;
+const TASK_SYSTEM = `Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
 
 const app = express();
 app.set('trust proxy', 1);
@@ -55,9 +56,9 @@ app.put('/api/data', guard, (req, res) => { fs.writeFileSync(DATA_FILE, JSON.str
 
 // ---- AI chat ----
 app.post('/api/chat', guard, async (req, res) => {
-  const { messages, context } = req.body;
+  const { messages, context, mode } = req.body;
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'bad request' });
-  const sys = SYSTEM + (context ? '\n\nContext about the user: ' + String(context).slice(0, 2000) : '');
+  const sys = mode === 'tasks' ? TASK_SYSTEM : SYSTEM + (context ? '\n\nContext about the user: ' + String(context).slice(0, 2000) : '');
   const msgs = messages.slice(-12).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 4000) }));
   try {
     if (USE_GEMINI) {
