@@ -11,12 +11,13 @@ try {
   });
 } catch (e) {}
 
-const { APP_PASSWORD, SESSION_SECRET, ANTHROPIC_API_KEY } = process.env;
-const MODEL = process.env.MODEL || 'claude-sonnet-5-5';
+const { APP_PASSWORD, SESSION_SECRET, ANTHROPIC_API_KEY, GEMINI_API_KEY } = process.env;
+const USE_GEMINI = !!GEMINI_API_KEY; // free option; falls back to Claude if only ANTHROPIC_API_KEY is set
+const MODEL = process.env.MODEL || (USE_GEMINI ? 'gemini-2.5-flash' : 'claude-sonnet-5-5');
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(process.env.DATA_DIR || __dirname, 'data.json');
-if (!APP_PASSWORD || !SESSION_SECRET || !ANTHROPIC_API_KEY) {
-  console.error('Set APP_PASSWORD, SESSION_SECRET and ANTHROPIC_API_KEY first.');
+if (!APP_PASSWORD || !SESSION_SECRET || !(ANTHROPIC_API_KEY || GEMINI_API_KEY)) {
+  console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY (free) or ANTHROPIC_API_KEY.');
   process.exit(1);
 }
 
@@ -56,15 +57,28 @@ app.put('/api/data', guard, (req, res) => { fs.writeFileSync(DATA_FILE, JSON.str
 app.post('/api/chat', guard, async (req, res) => {
   const { messages, context } = req.body;
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'bad request' });
+  const sys = SYSTEM + (context ? '\n\nContext about the user: ' + String(context).slice(0, 2000) : '');
+  const msgs = messages.slice(-12).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 4000) }));
   try {
+    if (USE_GEMINI) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: sys }] },
+          contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+          generationConfig: { maxOutputTokens: 800 }
+        })
+      });
+      const j = await r.json();
+      if (!r.ok) return res.status(502).json({ error: j.error?.message || 'AI error' });
+      const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+      return res.json({ text: text || 'Kuch jawab nahi aaya, dobara try karo.' });
+    }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: MODEL, max_tokens: 600,
-        system: SYSTEM + (context ? '\n\nContext about the user: ' + String(context).slice(0, 2000) : ''),
-        messages: messages.slice(-12).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 4000) }))
-      })
+      body: JSON.stringify({ model: MODEL, max_tokens: 600, system: sys, messages: msgs })
     });
     const j = await r.json();
     if (!r.ok) return res.status(502).json({ error: j.error?.message || 'AI error' });

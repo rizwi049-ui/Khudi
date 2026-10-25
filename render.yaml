@@ -8,9 +8,7 @@ services:
     envVars:
       - key: APP_PASSWORD
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      - key: MODEL
-        value: claude-sonnet-5-5
