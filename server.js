@@ -1,91 +1,68 @@
-const express = require('express');
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
+const express=require('express'),crypto=require('crypto'),fs=require('fs'),path=require('path');
+try{fs.readFileSync(path.join(__dirname,'.env'),'utf8').split('\n').forEach(l=>{const m=l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2]})}catch(e){}
+const{APP_PASSWORD,SESSION_SECRET,ANTHROPIC_API_KEY,GEMINI_API_KEY,UPSTASH_REDIS_REST_URL:UP,UPSTASH_REDIS_REST_TOKEN:UT}=process.env;
+const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-2.5-flash':'claude-sonnet-5-5'),PORT=process.env.PORT||3000;
+const DATA_FILE=path.join(process.env.DATA_DIR||__dirname,'data.json');
+if(!APP_PASSWORD||!SESSION_SECRET||!(ANTHROPIC_API_KEY||GEMINI_API_KEY)){console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY or ANTHROPIC_API_KEY.');process.exit(1)}
 
-// optional .env loader (no extra dependency)
-try {
-  fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split('\n').forEach(l => {
-    const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
-  });
-} catch (e) {}
+const SYSTEM=`Tum "Saathi" ho: user ke personal AI best friend, coach aur assistant. Har cheez mein madad karo (padhai, kaam, planning, advice, likhna, sawal-jawab). Roman Urdu/Hinglish mein baat karo (user ki zubaan match karo). Lehja dost jaisa, natural aur samajhdar, ChatGPT ki tarah poori baat-cheet. Emojis thore aur munasib; dukhi ya serious moment par bohat kam.
+Tumhein user ki yaaddasht, streak, scores aur poori chat history milti hai: purani baatein yaad rakho aur use karo. Jo cheez lambay arsay ke liye kaam ki ho (naam, maqsad, triggers, wajah, routine, kamyabi, pasand-napasand) "remember" action se save karo.
+Focus: khudi (khud ki pehchan), motivation, aur porn/masturbation ki aadat chhodna. Kabhi sharminda mat karo; relapse data hai, failure nahi. Urge ke waqt: urge surfing, jagah badlo, paani/wudu, exercise, trigger hatao, neend, kisi apne se baat. User ke urge ke ghanton/pattern ko dekh kar pehle se plan do. Self-rating par honest reaction, ek chhota qadam, ek sawal.
+Jawab hamesha poora likho, adhoora mat chhodo. Aam jawab 150 lafz tak, detail maangay to lamba. Agar user na-umeed ho ya khud ko nuqsan ka khayal aaye to narmi se kisi apne ya professional se abhi baat karne ko kaho.
+APP CONTROL: Tum user ki app chala sakte ho. Zaroorat ho to jawab ki bilkul aakhri line par likho: <<ACTIONS>>[{"do":"add_task","text":"..."},{"do":"done_task","text":"..."},{"do":"remove_task","text":"..."},{"do":"remember","text":"..."},{"do":"forget","text":"..."},{"do":"set_triggers","text":"..."},{"do":"start_streak"},{"do":"suggest_reset"}] . Sirf wohi actions do jo user ne maange ya jo wakai zaroori hon. Streak reset sirf suggest_reset se (user khud confirm karega). Ye line user ko nahi dikhti, is ka zikr mat karo.`;
+const TASK_SYSTEM=`Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
+function parse(t){let a=[];const m=t.match(/<<ACTIONS>>\s*(\[[\s\S]*\])/);if(m){try{a=JSON.parse(m[1])}catch(e){}}return{text:t.replace(/<<ACTIONS>>[\s\S]*$/,'').trim(),actions:Array.isArray(a)?a.slice(0,8):[]}}
 
-const { APP_PASSWORD, SESSION_SECRET, ANTHROPIC_API_KEY, GEMINI_API_KEY } = process.env;
-const USE_GEMINI = !!GEMINI_API_KEY; // free option; falls back to Claude if only ANTHROPIC_API_KEY is set
-const MODEL = process.env.MODEL || (USE_GEMINI ? 'gemini-2.5-flash' : 'claude-sonnet-5-5');
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(process.env.DATA_DIR || __dirname, 'data.json');
-if (!APP_PASSWORD || !SESSION_SECRET || !(ANTHROPIC_API_KEY || GEMINI_API_KEY)) {
-  console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY (free) or ANTHROPIC_API_KEY.');
-  process.exit(1);
-}
+const app=express();app.set('trust proxy',1);app.use(express.json({limit:'1mb'}));
+app.get('/health',(q,s)=>s.send('ok'));
+const sign=s=>crypto.createHmac('sha256',SESSION_SECRET).update(s).digest('hex');
+const eq=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
+const makeToken=()=>{const e=Date.now()+30*864e5;return e+'.'+sign(String(e))};
+const valid=t=>{if(!t)return false;const[e,s]=t.split('.');return s&&Number(e)>Date.now()&&eq(s,sign(e))};
+const cookie=r=>{const m=(r.headers.cookie||'').match(/(?:^|; )sess=([^;]+)/);return m&&m[1]};
+const fails={};
+app.post('/login',(req,res)=>{const ip=req.ip,f=fails[ip]||{n:0,t:0};
+  if(f.n>=5&&Date.now()-f.t<15*60e3)return res.status(429).json({error:'Too many tries. Wait 15 minutes.'});
+  if(typeof req.body.password==='string'&&eq(req.body.password,APP_PASSWORD)){fails[ip]={n:0,t:0};
+    res.setHeader('Set-Cookie',`sess=${makeToken()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30*86400}${req.secure?'; Secure':''}`);return res.json({ok:true})}
+  fails[ip]={n:f.n+1,t:Date.now()};res.status(401).json({error:'Wrong password'})});
+app.post('/logout',(q,res)=>{res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0');res.json({ok:true})});
+const guard=(req,res,next)=>valid(cookie(req))?next():res.status(401).json({error:'auth'});
 
-const SYSTEM = `You are "Saathi", the user's personal AI best friend and assistant. You can help with ANYTHING (questions, studies, work, planning tasks, advice, writing, explanations) and you understand the user's context. Speak in simple Roman Urdu/Hinglish (match the user's language). Use LOTS of happy emojis (😊🎉✨💪🌟🥳🤗) in every reply: cheerful, warm, energetic. You also support the user's growth: khudi (self-awareness, identity), motivation, and quitting the porn/masturbation habit. Never shame; a relapse is data, not failure. Give practical steps (urge surfing, environment design, replacing the habit, sleep, exercise). When the user shares a self-rating out of 10, react warmly, interpret it honestly, give one tiny next step and ask one follow-up question. Keep replies under 150 words unless asked for detail. If the person seems hopeless or unsafe, gently urge talking to a trusted person or a professional.`;
-const TASK_SYSTEM = `Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
-
-const app = express();
-app.set('trust proxy', 1);
-app.use(express.json({ limit: '1mb' }));
-
-// ---- auth: signed cookie, 30 days ----
-const sign = s => crypto.createHmac('sha256', SESSION_SECRET).update(s).digest('hex');
-const eq = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-function makeToken() { const exp = Date.now() + 30 * 864e5; return exp + '.' + sign(String(exp)); }
-function valid(tok) { if (!tok) return false; const [exp, sig] = tok.split('.'); return sig && Number(exp) > Date.now() && eq(sig, sign(exp)); }
-function cookie(req) { const m = (req.headers.cookie || '').match(/(?:^|; )sess=([^;]+)/); return m && m[1]; }
-const fails = {};
-app.post('/login', (req, res) => {
-  const ip = req.ip, f = fails[ip] || { n: 0, t: 0 };
-  if (f.n >= 5 && Date.now() - f.t < 15 * 60e3) return res.status(429).json({ error: 'Too many tries. Wait 15 minutes.' });
-  if (typeof req.body.password === 'string' && eq(req.body.password, APP_PASSWORD)) {
-    fails[ip] = { n: 0, t: 0 };
-    res.setHeader('Set-Cookie', `sess=${makeToken()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${30 * 86400}${req.secure ? '; Secure' : ''}`);
-    return res.json({ ok: true });
-  }
-  fails[ip] = { n: f.n + 1, t: Date.now() };
-  res.status(401).json({ error: 'Wrong password' });
-});
-app.post('/logout', (req, res) => { res.setHeader('Set-Cookie', 'sess=; Path=/; Max-Age=0'); res.json({ ok: true }); });
-const guard = (req, res, next) => valid(cookie(req)) ? next() : res.status(401).json({ error: 'auth' });
-
-// ---- data (single user, JSON file) ----
-const read = () => { try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch (e) { return {}; } };
-app.get('/api/data', guard, (req, res) => res.json(read()));
-app.put('/api/data', guard, (req, res) => { fs.writeFileSync(DATA_FILE, JSON.stringify(req.body)); res.json({ ok: true }); });
+// ---- storage: Upstash Redis (permanent, free) if configured, else local file ----
+const up=cmd=>fetch(UP,{method:'POST',headers:{Authorization:'Bearer '+UT,'content-type':'application/json'},body:JSON.stringify(cmd)}).then(r=>r.json());
+async function load(){try{if(UP){const j=await up(['GET','khudi']);return j.result?JSON.parse(j.result):{}}return JSON.parse(fs.readFileSync(DATA_FILE,'utf8'))}catch(e){return{}}}
+async function store(d){const s=JSON.stringify(d);if(UP){const j=await up(['SET','khudi',s]);if(j.error)throw new Error(j.error)}else fs.writeFileSync(DATA_FILE,s)}
+app.get('/api/data',guard,async(q,res)=>res.json(await load()));
+app.put('/api/data',guard,async(req,res)=>{const d=req.body;if(!d||typeof d!=='object'||Array.isArray(d))return res.status(400).json({error:'bad'});
+  if(Array.isArray(d.hist))d.hist=d.hist.slice(-800);
+  try{await store(d);res.json({ok:true})}catch(e){res.status(500).json({error:'save failed'})}});
 
 // ---- AI chat ----
-app.post('/api/chat', guard, async (req, res) => {
-  const { messages, context, mode } = req.body;
-  if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'bad request' });
-  const sys = mode === 'tasks' ? TASK_SYSTEM : SYSTEM + (context ? '\n\nContext about the user: ' + String(context).slice(0, 2000) : '');
-  const msgs = messages.slice(-12).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 4000) }));
-  try {
-    if (USE_GEMINI) {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: sys }] },
-          contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-          generationConfig: { maxOutputTokens: 800 }
-        })
-      });
-      const j = await r.json();
-      if (!r.ok) return res.status(502).json({ error: j.error?.message || 'AI error' });
-      const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
-      return res.json({ text: text || 'Kuch jawab nahi aaya, dobara try karo.' });
+app.post('/api/chat',guard,async(req,res)=>{
+  const{messages,context,mode}=req.body;
+  if(!Array.isArray(messages)||!messages.length)return res.status(400).json({error:'bad request'});
+  const tasks=mode==='tasks';
+  const sys=tasks?TASK_SYSTEM:SYSTEM+(context?'\n\nUSER KI YAADDASHT AUR DATA:\n'+String(context).slice(0,6000):'');
+  const msgs=messages.slice(-30).map(m=>({role:m.role==='assistant'?'assistant':'user',content:String(m.content).slice(0,4000)}));
+  const done=t=>res.json(tasks?{text:t,actions:[]}:parse(t));
+  try{
+    if(USE_GEMINI){
+      const cats=['HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'];
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':GEMINI_API_KEY},
+        body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),
+          safetySettings:cats.map(c=>({category:c,threshold:'BLOCK_ONLY_HIGH'})),
+          generationConfig:Object.assign({maxOutputTokens:3000,temperature:.9,thinkingConfig:{thinkingBudget:0}},tasks?{responseMimeType:'application/json'}:{})})});
+      const j=await r.json();
+      if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
+      const c=j.candidates?.[0],text=(c?.content?.parts||[]).map(p=>p.text||'').join('');
+      return done(text||'Is baar jawab nahi ban saka ('+(j.promptFeedback?.blockReason||c?.finishReason||'khali')+'). Apni baat dusre alfaaz mein likh kar dobara bhejo 💚');
     }
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 600, system: sys, messages: msgs })
-    });
-    const j = await r.json();
-    if (!r.ok) return res.status(502).json({ error: j.error?.message || 'AI error' });
-    res.json({ text: j.content.map(c => c.text || '').join('') });
-  } catch (e) { res.status(502).json({ error: 'AI unreachable' }); }
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:2000,system:sys,messages:msgs})});
+    const j=await r.json();
+    if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
+    done(j.content.map(c=>c.text||'').join('')||'Jawab khali aaya, dobara try karo 💚');
+  }catch(e){res.status(502).json({error:'AI unreachable'})}
 });
-
-app.use(express.static(path.join(__dirname, 'public')));
-app.listen(PORT, () => console.log('Khudi app running on port ' + PORT));
+app.use(express.static(path.join(__dirname,'public')));
+app.listen(PORT,()=>console.log('Saathi running on port '+PORT+(UP?' (Upstash storage)':' (file storage)')));
