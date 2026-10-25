@@ -24,6 +24,7 @@ const CONFIG = {
     "📱 Phone/laptop chhodo aur kamra badlo.",
     "🚿 Wudu karo ya thanda paani peeo.",
     "🏃 20 push-ups ya 5 minute tez chalna.",
+    "🤲 Dua ya zikr karo, kisi apne ko message karo.",
     "🌊 Urge 10–15 minute mein utar jaati hai. Bas intezar karo!"
   ],
   // Daily question: one area per day, rotating in this order

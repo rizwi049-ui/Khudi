@@ -14,15 +14,16 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div id="splash"><img src="/icon-192.png" alt=""><b>Saathi jaag raha hai ☕</b><span class="note">Pehli baar 30-60 second lag sakte hain</span></div>
 <div id="login" class="hide">
-  <div class="mascot">🤗</div><h2 id="lname"></h2><p class="note">Password daalo 🔐</p>
+  <div class="mascot"><img src="/icon-192.png" style="width:96px;border-radius:24px" alt=""></div><h2 id="lname"></h2><p class="note">Password daalo 🔐</p>
   <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
   <p id="lerr" class="note" style="color:var(--warn);min-height:20px"></p>
   <button class="btn" id="lbtn" style="width:100%">Enter 🚀</button>
 </div>
 
 <main id="app" class="hide">
-  <div class="top"><div class="brand"><div class="logo">🤗</div><div><b id="appName"></b><span id="tagline"></span></div></div><button class="lnk" id="out">Logout</button></div>
+  <div class="top"><div class="brand"><div class="logo"><img src="/icon-192.png" alt=""></div><div><b id="appName"></b><span id="tagline"></span></div></div><button class="lnk" id="out">Logout</button></div>
 
   <section id="v-home">
     <div class="card hero">
@@ -57,6 +58,9 @@
 
   <section id="v-score" class="hide">
     <div class="card c3"><h2>📊 Meri progress</h2><p class="note">Roz ke sawal ke numbers 💯</p><div id="sc"></div></div>
+    <div class="card"><h2>🧠 Saathi ki yaaddasht</h2><p class="note">Jo Saathi ne tumhare baare mein yaad rakha</p><div id="mem"></div></div>
+    <div class="card"><h2>🗓️ Roz ki history</h2><div id="hist"></div></div>
+    <div class="card"><h2>💾 Backup</h2><div style="display:flex;gap:8px"><button class="btn ghost" id="exp" style="flex:1">📤 Download</button><label class="btn ghost" style="flex:1;text-align:center">📥 Restore<input id="imp" type="file" accept=".json" hidden></label></div></div>
   </section>
 </main>
 
