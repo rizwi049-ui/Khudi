@@ -37,7 +37,6 @@ async function boot(){
 /* ---------- setup ---------- */
 document.title=CONFIG.appName;$('appName').textContent=CONFIG.appName;$('tagline').textContent=CONFIG.tagline;$('lname').textContent=CONFIG.appName;
 CONFIG.urgeSteps.forEach(s=>$('steps').appendChild(el('li','',s)));
-CONFIG.quick.forEach(c=>{const b=el('button','chip',c.label);b.onclick=()=>{show('chat');ask(c.q,c.title)};$('chips').appendChild(b)});
 function boom(){const C=['#7c5cff','#ff6bb5','#ffc83d','#2fcf8f','#ff8a5c'];for(let i=0;i<26;i++){const e=el('span','conf'),z=6+Math.random()*8;e.style.left=Math.random()*95+'vw';e.style.animationDelay=Math.random()*.5+'s';e.style.width=e.style.height=z+'px';e.style.background=C[i%C.length];e.style.borderRadius=i%2?'50%':'2px';document.body.appendChild(e);setTimeout(()=>e.remove(),2500)}}
 
 /* ---------- login / tabs ---------- */
@@ -49,13 +48,14 @@ function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
 
 /* ---------- AI helper ---------- */
-function ctx(){const p=D.tasks.filter(t=>!t.done).map(t=>t.t).slice(0,15),s=D.scores.slice(-10).map(x=>`${x.d} ${x.area}:${x.score}/10`),ut=D.urges.filter(x=>Date.now()-x<7*864e5),hrs=ut.map(x=>new Date(x).getHours());
-  return[`Now: ${new Date().toLocaleString('en-GB')}.`,D.start?`Clean streak: ${days()} days (started ${new Date(D.start).toLocaleDateString('en-CA')}).`:'Streak has not started yet.',`Urge/SOS button pressed ${ut.length} times this week${hrs.length?' (hours: '+hrs.join(',')+')':''}.`,D.memory.length?`Long-term memory: ${D.memory.join(' | ')}.`:'',p.length?`Pending tasks: ${p.join('; ')}.`:'',s.length?`Recent scores: ${s.join(', ')}.`:''].filter(Boolean).join('\n')}
+function ctx(){const oc=D.chats.filter(c=>c.id!==cur).sort((a,b)=>b.updated-a.updated).slice(0,4).map(c=>c.title+': '+c.msgs.filter(m=>m.role==='user').slice(-2).map(m=>String(m.content).slice(0,100)).join(' / '));const p=D.tasks.filter(t=>!t.done).map(t=>t.t).slice(0,15),s=D.scores.slice(-10).map(x=>`${x.d} ${x.area}:${x.score}/10`),ut=D.urges.filter(x=>Date.now()-x<7*864e5),hrs=ut.map(x=>new Date(x).getHours());
+  return[`Now: ${new Date().toLocaleString('en-GB')}.`,D.start?`Clean streak: ${days()} days (started ${new Date(D.start).toLocaleDateString('en-CA')}).`:'Streak has not started yet.',`Urge/SOS button pressed ${ut.length} times this week${hrs.length?' (hours: '+hrs.join(',')+')':''}.`,D.memory.length?`Long-term memory: ${D.memory.join(' | ')}.`:'',p.length?`Pending tasks: ${p.join('; ')}.`:'',oc.length?`Recent topics from earlier chats: ${oc.join(' | ')}.`:'',s.length?`Recent scores: ${s.join(', ')}.`:''].filter(Boolean).join('\n')}
 function thread(c){const m=c.msgs.slice(-30);while(m[0]&&m[0].role!=='user')m.shift();return m}
+async function apiRetry(msgs,mode){let err;for(let i=0;i<3;i++){try{return await api(msgs,mode)}catch(e){err=e;if(e===0)throw e;await new Promise(r=>setTimeout(r,1500*(i+1)))}}throw err}
 async function api(messages,mode){
   const r=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages,context:ctx(),mode})});
   if(r.status===401){location.reload();throw 0}
-  const j=await r.json();if(!r.ok)throw 0;if(mode!=='tasks'&&mode!=='title')applyActions(j.actions);return j.text;
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Server error '+r.status));if(mode!=='tasks'&&mode!=='title')applyActions(j.actions);return j.text;
 }
 
 /* ---------- home / streak ---------- */
@@ -104,12 +104,12 @@ async function ask(text,title){
   if(!c){c={id:uid(),title:title||mkTitle(text),created:Date.now(),updated:Date.now(),msgs:[]};D.chats.unshift(c);cur=c.id;$('msgs').innerHTML='';drawHead()}
   c.msgs.push({role:'user',content:text});c.updated=Date.now();save();
   bubble('u',text);const out=bubble('a','');out.innerHTML=DOTS;
-  try{const t=await api(thread(c));c.msgs.push({role:'assistant',content:t});c.updated=Date.now();
+  try{const t=await apiRetry(thread(c));c.msgs.push({role:'assistant',content:t});c.updated=Date.now();
     if(cur===c.id){if(out.isConnected)await type(out,t);else renderChat(true)}
     save();if(!title&&c.msgs.length===2)makeTitle(c,text)}
   catch(e){c.msgs.pop();
     if(!c.msgs.length){D.chats=D.chats.filter(x=>x!==c);if(cur===c.id){cur=null;drawHead()}}
-    if(out.isConnected)out.textContent='Oops 🙈 something went wrong (the server may be waking up). Please try again in a moment 💚';
+    if(out.isConnected)out.textContent='I could not get a reply right now 🙏 Your message is back in the box, just tap Send again'+(e&&e.message?' ('+e.message+')':'')+'.';
     if(!$('inp').value)$('inp').value=text;save()}
   busy=false;$('send').disabled=false;
 }
@@ -161,7 +161,7 @@ $('dSave').onclick=async()=>{const a=areaToday(),score=+$('dRange').value,note=$
   $('dStep1').classList.add('hide');$('dStep2').classList.remove('hide');$('dReply').textContent='Saathi is thinking...';
   const shown=`Daily check-in: ${a.name} ${score}/10${note?'. '+note:''}`;
   const prompt=`Aaj maine "${a.name}" mein khud ko ${score}/10 diye.${note?' Note: '+note:''} Reaction do, ek chhota agla qadam batao aur ek sawal poocho.`;
-  try{const t=await api([{role:'user',content:prompt}]);
+  try{const t=await apiRetry([{role:'user',content:prompt}]);
     D.chats.unshift({id:uid(),title:'Daily check-in',created:Date.now(),updated:Date.now(),msgs:[{role:'user',content:shown},{role:'assistant',content:t}]});
     save();$('dReply').textContent=t}
   catch(e){$('dReply').textContent=`Your ${score}/10 is saved. Well done!`}};

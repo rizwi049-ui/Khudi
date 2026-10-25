@@ -3,7 +3,7 @@
 const CONFIG = {
   appName: "Saathi",
   tagline: "Your AI friend",
-  greeting: "Hey! I'm Saathi, your AI friend 😊 Ask me anything: work, studies, motivation, or whatever is on your mind. How are you feeling today? 🌈",
+  greeting: "Hey! I'm Saathi, your AI friend 😊 I'm here to help you understand yourself (khudi) and keep your motivation strong. Tell me what's on your mind. How are you feeling today? 🌈",
   milestones: [1, 3, 7, 14, 21, 30, 60, 90, 180, 365],
   quotes: [
     "You are bigger than your habits. Make one decision today on your own terms.",
@@ -13,14 +13,6 @@ const CONFIG = {
     "Falling is not failure. Not getting up is.",
     "Small steps, every single day.",
     "Spend your spare time building who you are."
-  ],
-  // label = button text (English), title = name of the chat it opens, q = message sent to the AI
-  quick: [
-    { label: "Motivation", title: "Motivation", q: "Mujhe abhi motivation chahiye!" },
-    { label: "Today's plan", title: "Today's plan", q: "Mere pending kaam dekh kar aaj ka plan banao." },
-    { label: "My identity", title: "My identity", q: "Mujhe apni pehchan (khudi) samajhne mein madad karo." },
-    { label: "Night plan", title: "Night plan", q: "Raat ko akela hone par urge aati hai. Mujhe ek plan banao." },
-    { label: "Fun challenge", title: "Fun challenge", q: "Mujhe ek mazedaar baat ya challenge do!" }
   ],
   urgeSteps: [
     "Put the phone/laptop down and change rooms.",
