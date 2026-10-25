@@ -6,10 +6,11 @@ const DATA_FILE=path.join(process.env.DATA_DIR||__dirname,'data.json');
 if(!APP_PASSWORD||!SESSION_SECRET||!(ANTHROPIC_API_KEY||GEMINI_API_KEY)){console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY or ANTHROPIC_API_KEY.');process.exit(1)}
 
 const SYSTEM=`Tum "Saathi" ho: user ke personal AI best friend, coach aur assistant. Har cheez mein madad karo (padhai, kaam, planning, advice, likhna, sawal-jawab). Roman Urdu/Hinglish mein baat karo (user ki zubaan match karo). Lehja dost jaisa, natural aur samajhdar, ChatGPT ki tarah poori baat-cheet. Emojis thore aur munasib; dukhi ya serious moment par bohat kam.
-Tumhein user ki yaaddasht, streak, scores aur poori chat history milti hai: purani baatein yaad rakho aur use karo. Jo cheez lambay arsay ke liye kaam ki ho (naam, maqsad, triggers, wajah, routine, kamyabi, pasand-napasand) "remember" action se save karo.
+Tumhein user ki yaaddasht, streak, scores aur poori chat history milti hai: purani baatein yaad rakho aur use karo. Jo cheez lambay arsay ke liye kaam ki ho (naam, maqsad, wajah, routine, kamyabi, pasand-napasand) "remember" action se save karo.
 Focus: khudi (khud ki pehchan), motivation, aur porn/masturbation ki aadat chhodna. Kabhi sharminda mat karo; relapse data hai, failure nahi. Urge ke waqt: urge surfing, jagah badlo, paani/wudu, exercise, trigger hatao, neend, kisi apne se baat. User ke urge ke ghanton/pattern ko dekh kar pehle se plan do. Self-rating par honest reaction, ek chhota qadam, ek sawal.
 Jawab hamesha poora likho, adhoora mat chhodo. Aam jawab 150 lafz tak, detail maangay to lamba. Agar user na-umeed ho ya khud ko nuqsan ka khayal aaye to narmi se kisi apne ya professional se abhi baat karne ko kaho.
-APP CONTROL: Tum user ki app chala sakte ho. Zaroorat ho to jawab ki bilkul aakhri line par likho: <<ACTIONS>>[{"do":"add_task","text":"..."},{"do":"done_task","text":"..."},{"do":"remove_task","text":"..."},{"do":"remember","text":"..."},{"do":"forget","text":"..."},{"do":"set_triggers","text":"..."},{"do":"start_streak"},{"do":"suggest_reset"}] . Sirf wohi actions do jo user ne maange ya jo wakai zaroori hon. Streak reset sirf suggest_reset se (user khud confirm karega). Ye line user ko nahi dikhti, is ka zikr mat karo.`;
+APP CONTROL: Tum user ki app chala sakte ho. Zaroorat ho to jawab ki bilkul aakhri line par likho: <<ACTIONS>>[{"do":"add_task","text":"..."},{"do":"done_task","text":"..."},{"do":"remove_task","text":"..."},{"do":"remember","text":"..."},{"do":"forget","text":"..."},{"do":"start_streak"},{"do":"suggest_reset"}] . Sirf wohi actions do jo user ne maange ya jo wakai zaroori hon. Streak reset sirf suggest_reset se (user khud confirm karega). Ye line user ko nahi dikhti, is ka zikr mat karo.`;
+const TITLE_SYSTEM=`Write a very short title (max 5 words, in English, no quotes, no emoji, no punctuation at the end) that summarises the topic of the user's message. Reply with ONLY the title.`;
 const TASK_SYSTEM=`Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
 function parse(t){let a=[];const m=t.match(/<<ACTIONS>>\s*(\[[\s\S]*\])/);if(m){try{a=JSON.parse(m[1])}catch(e){}}return{text:t.replace(/<<ACTIONS>>[\s\S]*$/,'').trim(),actions:Array.isArray(a)?a.slice(0,8):[]}}
 
@@ -36,16 +37,17 @@ async function store(d){const s=JSON.stringify(d);if(UP){const j=await up(['SET'
 app.get('/api/data',guard,async(q,res)=>res.json(await load()));
 app.put('/api/data',guard,async(req,res)=>{const d=req.body;if(!d||typeof d!=='object'||Array.isArray(d))return res.status(400).json({error:'bad'});
   if(Array.isArray(d.hist))d.hist=d.hist.slice(-800);
+  if(Array.isArray(d.chats))d.chats=d.chats.sort((a,b)=>(b.updated||0)-(a.updated||0)).slice(0,200);
   try{await store(d);res.json({ok:true})}catch(e){res.status(500).json({error:'save failed'})}});
 
 // ---- AI chat ----
 app.post('/api/chat',guard,async(req,res)=>{
   const{messages,context,mode}=req.body;
   if(!Array.isArray(messages)||!messages.length)return res.status(400).json({error:'bad request'});
-  const tasks=mode==='tasks';
-  const sys=tasks?TASK_SYSTEM:SYSTEM+(context?'\n\nUSER KI YAADDASHT AUR DATA:\n'+String(context).slice(0,6000):'');
+  const tasks=mode==='tasks',title=mode==='title',plain=tasks||title;
+  const sys=tasks?TASK_SYSTEM:title?TITLE_SYSTEM:SYSTEM+(context?'\n\nUSER KI YAADDASHT AUR DATA:\n'+String(context).slice(0,6000):'');
   const msgs=messages.slice(-30).map(m=>({role:m.role==='assistant'?'assistant':'user',content:String(m.content).slice(0,4000)}));
-  const done=t=>res.json(tasks?{text:t,actions:[]}:parse(t));
+  const done=t=>res.json(plain?{text:t,actions:[]}:parse(t));
   try{
     if(USE_GEMINI){
       const cats=['HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'];
@@ -56,12 +58,12 @@ app.post('/api/chat',guard,async(req,res)=>{
       const j=await r.json();
       if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
       const c=j.candidates?.[0],text=(c?.content?.parts||[]).map(p=>p.text||'').join('');
-      return done(text||'Is baar jawab nahi ban saka ('+(j.promptFeedback?.blockReason||c?.finishReason||'khali')+'). Apni baat dusre alfaaz mein likh kar dobara bhejo 💚');
+      return done(text||(plain?'':'Is baar jawab nahi ban saka ('+(j.promptFeedback?.blockReason||c?.finishReason||'khali')+'). Apni baat dusre alfaaz mein likh kar dobara bhejo 💚'));
     }
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:2000,system:sys,messages:msgs})});
     const j=await r.json();
     if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
-    done(j.content.map(c=>c.text||'').join('')||'Jawab khali aaya, dobara try karo 💚');
+    done(j.content.map(c=>c.text||'').join('')||(plain?'':'Jawab khali aaya, dobara try karo 💚'));
   }catch(e){res.status(502).json({error:'AI unreachable'})}
 });
 app.use(express.static(path.join(__dirname,'public')));

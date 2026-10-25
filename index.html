@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#7c5cff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Saathi">
+<title>Saathi</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="splash"><img src="/icon-192.png" alt=""><b>Saathi is waking up</b><span class="note">The first load can take 30-60 seconds</span></div>
+<div id="login" class="hide">
+  <div class="mascot"><img src="/icon-192.png" style="width:96px;border-radius:24px" alt=""></div><h2 id="lname"></h2><p class="note">Enter your password</p>
+  <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+  <p id="lerr" class="note" style="color:var(--warn);min-height:20px"></p>
+  <button class="btn" id="lbtn" style="width:100%">Enter</button>
+</div>
+
+<main id="app" class="hide">
+  <div class="top"><div class="brand"><div class="logo"><img src="/icon-192.png" alt=""></div><div><b id="appName"></b><span id="tagline"></span></div></div><button class="lnk" id="out">Logout</button></div>
+
+  <section id="v-home">
+    <div class="card hero">
+      <div class="hi" id="hi"></div>
+      <div class="ring"><svg width="170" height="170" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/><circle id="arc" cx="60" cy="60" r="54" fill="none" stroke="#ffd84d" stroke-width="8" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3" style="transition:stroke-dashoffset .8s"/></svg>
+        <div class="num"><b id="days">0</b><span>days clean</span></div></div>
+      <div id="next" style="font-size:13px;opacity:.9"></div>
+      <p class="quote" id="quote"></p>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn light" id="startS">Start streak</button><button class="btn light hide" id="reset">Fresh start</button></div>
+    </div>
+    <button class="btn sos" id="urge">I have an urge right now</button>
+    <div class="card c2"><h2>Today's tasks</h2><div id="hTasks"></div><button class="lnk" id="allT">See all tasks &rarr;</button></div>
+    <div class="card c3"><h2>Milestones</h2><div class="badges" id="badges"></div></div>
+  </section>
+
+  <section id="v-chat" class="hide">
+    <div class="chathead"><button class="lnk" id="histBtn">History</button><b id="chatTitle">New chat</b><button class="lnk" id="newChat">New chat</button></div>
+    <div class="chips" id="chips"></div>
+    <div class="chat" id="msgs"></div>
+    <div class="compose"><textarea id="inp" rows="1" placeholder="Message Saathi..."></textarea><button class="btn" id="send">Send</button></div>
+    <div style="text-align:center;margin-top:10px"><button class="lnk hide" id="delChat">Delete this chat</button></div>
+  </section>
+
+  <section id="v-tasks" class="hide">
+    <div class="card c2"><h2>Give all your tasks to AI</h2><p class="note">Write whatever is on your mind and Saathi will turn it into a list.</p>
+      <textarea id="dumpT" rows="3" placeholder="Test tomorrow, help mom, gym, assignment..."></textarea>
+      <button class="btn" id="dump" style="margin-top:10px;width:100%">Create tasks with AI</button></div>
+    <div class="card"><div style="display:flex;gap:8px"><input id="newT" placeholder="Add a new task"><button class="btn" id="addT">Add</button></div>
+      <div id="tl" style="margin-top:12px"></div>
+      <button class="btn ghost" id="plan" style="margin-top:10px;width:100%">Plan my day with AI</button></div>
+  </section>
+
+  <section id="v-score" class="hide">
+    <div class="card c3"><h2>My progress</h2><p class="note">Your daily check-in scores</p><div id="sc"></div></div>
+    <div class="card"><h2>Saathi's memory</h2><p class="note">What Saathi has remembered about you</p><div id="mem"></div></div>
+    <div class="card"><h2>Daily log</h2><div id="hist"></div></div>
+    <div class="card"><h2>Backup</h2><div style="display:flex;gap:8px"><button class="btn ghost" id="exp" style="flex:1">Download</button><label class="btn ghost" style="flex:1;text-align:center">Restore<input id="imp" type="file" accept=".json" hidden></label></div></div>
+  </section>
+</main>
+
+<nav id="nav" class="hide">
+  <button data-t="home" class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Today</button>
+  <button data-t="chat"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.5 7.2L3 21l1.8-5.5A8 8 0 1 1 21 12z"/></svg>Chat</button>
+  <button data-t="tasks"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg>Tasks</button>
+  <button data-t="score"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>Progress</button>
+</nav>
+
+<div id="hpanel" class="hide"><div class="hwrap">
+  <div class="hbar"><h2>Chat history</h2><div><button class="lnk" id="hNew">New chat</button><button class="lnk" id="hClose">Close</button></div></div>
+  <div id="hlist"></div>
+</div></div>
+
+<div id="sos" class="hide">
+  <div class="note" style="color:#fff;opacity:.85">Breathe in... breathe out... this will pass</div>
+  <div class="breath">breathe</div><div id="clock">10:00</div>
+  <ol id="steps"></ol>
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn light" id="sosAI">Talk to Saathi</button><button class="btn" id="sosOk">I'm okay now</button></div>
+</div>
+
+<div id="daily" class="hide"><div class="dcard">
+  <div id="dStep1">
+    <div class="note">Today's question &middot; <b id="dArea"></b></div>
+    <h2 id="dQ" style="font-size:20px;margin:8px 0 14px"></h2>
+    <div class="dNum" id="dNum">7</div>
+    <input type="range" id="dRange" min="1" max="10" value="7" style="padding:0">
+    <div class="note" style="display:flex;justify-content:space-between"><span>1 (low)</span><span>10 (great)</span></div>
+    <textarea id="dNote" rows="2" placeholder="Anything to add? (optional)" style="margin:10px 0"></textarea>
+    <button class="btn" id="dSave" style="width:100%">Save</button>
+    <button class="lnk" id="dSkip" style="width:100%">Later</button>
+  </div>
+  <div id="dStep2" class="hide"><p id="dReply" style="white-space:pre-wrap;font-size:15px"></p><button class="btn" id="dClose" style="width:100%">Let's start</button></div>
+</div></div>
+
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
