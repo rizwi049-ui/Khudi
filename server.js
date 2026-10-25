@@ -1,7 +1,7 @@
 const express=require('express'),crypto=require('crypto'),fs=require('fs'),path=require('path');
 try{fs.readFileSync(path.join(__dirname,'.env'),'utf8').split('\n').forEach(l=>{const m=l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2]})}catch(e){}
 const{APP_PASSWORD,SESSION_SECRET,ANTHROPIC_API_KEY,GEMINI_API_KEY,UPSTASH_REDIS_REST_URL:UP,UPSTASH_REDIS_REST_TOKEN:UT}=process.env;
-const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-2.5-flash':'claude-sonnet-5-5'),PORT=process.env.PORT||3000;
+const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-3.8-flash':'claude-sonnet-5-5'),PORT=process.env.PORT||3000;
 const DATA_FILE=path.join(process.env.DATA_DIR||__dirname,'data.json');
 if(!APP_PASSWORD||!SESSION_SECRET||!(ANTHROPIC_API_KEY||GEMINI_API_KEY)){console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY or ANTHROPIC_API_KEY.');process.exit(1)}
 
@@ -14,6 +14,11 @@ const TITLE_SYSTEM=`Write a very short title (max 5 words, in English, no quotes
 const TASK_SYSTEM=`Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
 function parse(t){let a=[];const m=t.match(/<<ACTIONS>>\s*(\[[\s\S]*\])/);if(m){try{a=JSON.parse(m[1])}catch(e){}}return{text:t.replace(/<<ACTIONS>>[\s\S]*$/,'').trim(),actions:Array.isArray(a)?a.slice(0,8):[]}}
 
+const GM_FALLBACK=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-3.6-flash'];let autoModel=null;
+const wait=ms=>new Promise(z=>setTimeout(z,ms));
+async function discoverModels(){try{const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',{headers:{'x-goog-api-key':GEMINI_API_KEY}});const j=await r.json();
+  const v=n=>parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]),lite=n=>/lite/.test(n)?1:0;
+  return(j.models||[]).filter(m=>/^models\/gemini-\d+(\.\d+)?-flash(-lite)?$/.test(m.name)&&(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.slice(7)).sort((a,b)=>v(b)-v(a)||lite(a)-lite(b)).slice(0,3)}catch(e){return[]}}
 const app=express();app.set('trust proxy',1);app.use(express.json({limit:'1mb'}));
 app.get('/health',(q,s)=>s.send('ok'));
 const sign=s=>crypto.createHmac('sha256',SESSION_SECRET).update(s).digest('hex');
@@ -51,24 +56,24 @@ app.post('/api/chat',guard,async(req,res)=>{
   try{
     if(USE_GEMINI){
       const cats=['HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'];
-      const list=[MODEL,...['gemini-2.5-flash-lite','gemini-2.0-flash'].filter(m=>m!==MODEL)];
-      let r,j,lastErr='AI error';
-      for(const m of list){
-        const gc=Object.assign({maxOutputTokens:4096,temperature:.9},/2\.5/.test(m)?{thinkingConfig:{thinkingBudget:0}}:{},tasks?{responseMimeType:'application/json'}:{});
-        const body=JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==='assistant'?'model':'user',parts:[{text:x.content}]})),safetySettings:cats.map(c=>({category:c,threshold:'BLOCK_ONLY_HIGH'})),generationConfig:gc});
+      const body=JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==='assistant'?'model':'user',parts:[{text:x.content}]})),safetySettings:cats.map(c=>({category:c,threshold:'BLOCK_ONLY_HIGH'})),
+        generationConfig:Object.assign({maxOutputTokens:8192,temperature:.9},tasks?{responseMimeType:'application/json'}:{})});
+      const tried=new Set();let r,j,firstErr='',authFail=false;
+      const attempt=async m=>{if(tried.has(m))return false;tried.add(m);
         for(let k=0;k<2;k++){
           r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':GEMINI_API_KEY},body});
           j=await r.json().catch(()=>({}));
-          if(r.ok||r.status===401||r.status===403)break;
-          lastErr=j.error?.message||'AI error';
-          if(![429,500,502,503,504].includes(r.status))break;
-          await new Promise(z=>setTimeout(z,700));
-        }
-        if(r.ok||r.status===401||r.status===403)break;
-        lastErr=j.error?.message||lastErr;
-      }
-      if(!r.ok)return res.status(502).json({error:j.error?.message||lastErr});
-      const c=j.candidates?.[0];let text=(c?.content?.parts||[]).map(p=>p.text||'').join('');
+          if(r.ok)return true;
+          if(!firstErr)firstErr=j.error?.message||('AI error '+r.status);
+          if(r.status===401||r.status===403){authFail=true;return false}
+          if(![429,500,502,503,504].includes(r.status))return false;
+          await wait(700);
+        }return false};
+      let ok=false;
+      for(const m of [autoModel,MODEL,...GM_FALLBACK].filter(Boolean)){if(await attempt(m)){ok=true;if(m!==MODEL)autoModel=m;break}if(authFail)break}
+      if(!ok&&!authFail){for(const m of await discoverModels()){if(await attempt(m)){ok=true;autoModel=m;break}if(authFail)break}}
+      if(!ok)return res.status(502).json({error:firstErr||'AI error'});
+      const c=j.candidates?.[0];let text=(c?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
       if(c?.finishReason==='MAX_TOKENS'&&!plain&&!text.includes('<<ACTIONS>>')){const k=text.search(/[.!?\u2026\n][^.!?\u2026\n]*$/);if(k>text.length*.5)text=text.slice(0,k+1)}
       return done(text||(plain?'':'Is baar jawab nahi ban saka ('+(j.promptFeedback?.blockReason||c?.finishReason||'khali')+'). Apni baat dusre alfaaz mein likh kar dobara bhejo 💚'));
     }
