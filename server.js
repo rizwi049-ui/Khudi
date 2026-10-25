@@ -1,7 +1,7 @@
 const express=require('express'),crypto=require('crypto'),fs=require('fs'),path=require('path');
 try{fs.readFileSync(path.join(__dirname,'.env'),'utf8').split('\n').forEach(l=>{const m=l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2]})}catch(e){}
 const{APP_PASSWORD,SESSION_SECRET,ANTHROPIC_API_KEY,GEMINI_API_KEY,UPSTASH_REDIS_REST_URL:UP,UPSTASH_REDIS_REST_TOKEN:UT}=process.env;
-const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-3.8-flash':'claude-sonnet-5-5'),PORT=process.env.PORT||3000;
+const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-3.5-flash-lite':'claude-sonnet-5-5'),PORT=process.env.PORT||3000;
 const DATA_FILE=path.join(process.env.DATA_DIR||__dirname,'data.json');
 if(!APP_PASSWORD||!SESSION_SECRET||!(ANTHROPIC_API_KEY||GEMINI_API_KEY)){console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY or ANTHROPIC_API_KEY.');process.exit(1)}
 
@@ -14,7 +14,7 @@ const TITLE_SYSTEM=`Write a very short title (max 5 words, in English, no quotes
 const TASK_SYSTEM=`Extract the user's to-dos from their message. Reply with ONLY a JSON array of short task strings (max 12), in the user's own language, no markdown, no explanation.`;
 function parse(t){let a=[];const m=t.match(/<<ACTIONS>>\s*(\[[\s\S]*\])/);if(m){try{a=JSON.parse(m[1])}catch(e){}}return{text:t.replace(/<<ACTIONS>>[\s\S]*$/,'').trim(),actions:Array.isArray(a)?a.slice(0,8):[]}}
 
-const GM_FALLBACK=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-3.6-flash'];let autoModel=null;
+const GM_FALLBACK=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-3.8-flash','gemini-3.6-flash'];let autoModel=null;
 const wait=ms=>new Promise(z=>setTimeout(z,ms));
 async function discoverModels(){try{const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',{headers:{'x-goog-api-key':GEMINI_API_KEY}});const j=await r.json();
   const v=n=>parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]),lite=n=>/lite/.test(n)?1:0;
@@ -66,7 +66,7 @@ app.post('/api/chat',guard,async(req,res)=>{
           if(r.ok)return true;
           if(!firstErr)firstErr=j.error?.message||('AI error '+r.status);
           if(r.status===401||r.status===403){authFail=true;return false}
-          if(![429,500,502,503,504].includes(r.status))return false;
+          if(![500,502,503,504].includes(r.status))return false;
           await wait(700);
         }return false};
       let ok=false;
