@@ -51,7 +51,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.
 function ctx(){const oc=D.chats.filter(c=>c.id!==cur).sort((a,b)=>b.updated-a.updated).slice(0,4).map(c=>c.title+': '+c.msgs.filter(m=>m.role==='user').slice(-2).map(m=>String(m.content).slice(0,100)).join(' / '));const p=D.tasks.filter(t=>!t.done).map(t=>t.t).slice(0,15),s=D.scores.slice(-10).map(x=>`${x.d} ${x.area}:${x.score}/10`),ut=D.urges.filter(x=>Date.now()-x<7*864e5),hrs=ut.map(x=>new Date(x).getHours());
   return[`Now: ${new Date().toLocaleString('en-GB')}.`,D.start?`Clean streak: ${days()} days (started ${new Date(D.start).toLocaleDateString('en-CA')}).`:'Streak has not started yet.',`Urge/SOS button pressed ${ut.length} times this week${hrs.length?' (hours: '+hrs.join(',')+')':''}.`,D.memory.length?`Long-term memory: ${D.memory.join(' | ')}.`:'',p.length?`Pending tasks: ${p.join('; ')}.`:'',oc.length?`Recent topics from earlier chats: ${oc.join(' | ')}.`:'',s.length?`Recent scores: ${s.join(', ')}.`:''].filter(Boolean).join('\n')}
 function thread(c){const m=c.msgs.slice(-30);while(m[0]&&m[0].role!=='user')m.shift();return m}
-async function apiRetry(msgs,mode){let err;for(let i=0;i<3;i++){try{return await api(msgs,mode)}catch(e){err=e;if(e===0)throw e;await new Promise(r=>setTimeout(r,1500*(i+1)))}}throw err}
+async function apiRetry(msgs,mode){let err;for(let i=0;i<2;i++){try{return await api(msgs,mode)}catch(e){err=e;if(e===0)throw e;await new Promise(r=>setTimeout(r,1500*(i+1)))}}throw err}
 async function api(messages,mode){
   const r=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages,context:ctx(),mode})});
   if(r.status===401){location.reload();throw 0}
