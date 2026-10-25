@@ -5,7 +5,7 @@ const USE_GEMINI=!!GEMINI_API_KEY,MODEL=process.env.MODEL||(USE_GEMINI?'gemini-2
 const DATA_FILE=path.join(process.env.DATA_DIR||__dirname,'data.json');
 if(!APP_PASSWORD||!SESSION_SECRET||!(ANTHROPIC_API_KEY||GEMINI_API_KEY)){console.error('Set APP_PASSWORD, SESSION_SECRET and GEMINI_API_KEY or ANTHROPIC_API_KEY.');process.exit(1)}
 
-const SYSTEM=`Tum "Saathi" ho: user ke personal AI best friend, coach aur assistant. Har cheez mein madad karo (padhai, kaam, planning, advice, likhna, sawal-jawab). Roman Urdu/Hinglish mein baat karo (user ki zubaan match karo). Lehja dost jaisa, natural aur samajhdar, ChatGPT ki tarah poori baat-cheet. Emojis thore aur munasib; dukhi ya serious moment par bohat kam.
+const SYSTEM=`Tum "Saathi" ho: user ke personal AI best friend aur coach. Tumhare do asli maqsad hain: khudi (user ko khud ki pehchan samajhne mein madad) aur motivation. Baaki sawalon mein bhi madad karo, lekin baat naturally in dono ki taraf le aao. Roman Urdu/Hinglish mein baat karo (user ki zubaan match karo). Lehja dost jaisa, natural aur samajhdar, ChatGPT ki tarah poori baat-cheet. Emojis thore aur munasib; dukhi ya serious moment par bohat kam.
 Tumhein user ki yaaddasht, streak, scores aur poori chat history milti hai: purani baatein yaad rakho aur use karo. Jo cheez lambay arsay ke liye kaam ki ho (naam, maqsad, wajah, routine, kamyabi, pasand-napasand) "remember" action se save karo.
 Focus: khudi (khud ki pehchan), motivation, aur porn/masturbation ki aadat chhodna. Kabhi sharminda mat karo; relapse data hai, failure nahi. Urge ke waqt: urge surfing, jagah badlo, paani/wudu, exercise, trigger hatao, neend, kisi apne se baat. User ke urge ke ghanton/pattern ko dekh kar pehle se plan do. Self-rating par honest reaction, ek chhota qadam, ek sawal.
 Jawab hamesha poora likho, adhoora mat chhodo. Aam jawab 150 lafz tak, detail maangay to lamba. Agar user na-umeed ho ya khud ko nuqsan ka khayal aaye to narmi se kisi apne ya professional se abhi baat karne ko kaho.
@@ -51,16 +51,28 @@ app.post('/api/chat',guard,async(req,res)=>{
   try{
     if(USE_GEMINI){
       const cats=['HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'];
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':GEMINI_API_KEY},
-        body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),
-          safetySettings:cats.map(c=>({category:c,threshold:'BLOCK_ONLY_HIGH'})),
-          generationConfig:Object.assign({maxOutputTokens:3000,temperature:.9,thinkingConfig:{thinkingBudget:0}},tasks?{responseMimeType:'application/json'}:{})})});
-      const j=await r.json();
-      if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
-      const c=j.candidates?.[0],text=(c?.content?.parts||[]).map(p=>p.text||'').join('');
+      const list=[MODEL,...['gemini-2.5-flash-lite','gemini-2.0-flash'].filter(m=>m!==MODEL)];
+      let r,j,lastErr='AI error';
+      for(const m of list){
+        const gc=Object.assign({maxOutputTokens:4096,temperature:.9},/2\.5/.test(m)?{thinkingConfig:{thinkingBudget:0}}:{},tasks?{responseMimeType:'application/json'}:{});
+        const body=JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==='assistant'?'model':'user',parts:[{text:x.content}]})),safetySettings:cats.map(c=>({category:c,threshold:'BLOCK_ONLY_HIGH'})),generationConfig:gc});
+        for(let k=0;k<2;k++){
+          r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':GEMINI_API_KEY},body});
+          j=await r.json().catch(()=>({}));
+          if(r.ok||r.status===401||r.status===403)break;
+          lastErr=j.error?.message||'AI error';
+          if(![429,500,502,503,504].includes(r.status))break;
+          await new Promise(z=>setTimeout(z,700));
+        }
+        if(r.ok||r.status===401||r.status===403)break;
+        lastErr=j.error?.message||lastErr;
+      }
+      if(!r.ok)return res.status(502).json({error:j.error?.message||lastErr});
+      const c=j.candidates?.[0];let text=(c?.content?.parts||[]).map(p=>p.text||'').join('');
+      if(c?.finishReason==='MAX_TOKENS'&&!plain&&!text.includes('<<ACTIONS>>')){const k=text.search(/[.!?\u2026\n][^.!?\u2026\n]*$/);if(k>text.length*.5)text=text.slice(0,k+1)}
       return done(text||(plain?'':'Is baar jawab nahi ban saka ('+(j.promptFeedback?.blockReason||c?.finishReason||'khali')+'). Apni baat dusre alfaaz mein likh kar dobara bhejo 💚'));
     }
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:2000,system:sys,messages:msgs})});
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:3000,system:sys,messages:msgs})});
     const j=await r.json();
     if(!r.ok)return res.status(502).json({error:j.error?.message||'AI error'});
     done(j.content.map(c=>c.text||'').join('')||(plain?'':'Jawab khali aaya, dobara try karo 💚'));
