@@ -5,6 +5,18 @@ const CONFIG = {
   tagline: "Your AI friend",
   greeting: "Hey! I'm Saathi, your AI friend 😊 I'm here to help you understand yourself (khudi) and keep your motivation strong. Tell me what's on your mind. How are you feeling today? 🌈",
   milestones: [1, 3, 7, 14, 21, 30, 60, 90, 180, 365],
+  // Namaz list (in order of the day). core:true = counted in "x of 5" and the streak. Set core:true on Witr too if you want it counted.
+  prayers: [
+    { n: "Tahajjud", core: false },
+    { n: "Fajr",     core: true  },
+    { n: "Ishraq",   core: false },
+    { n: "Chasht",   core: false },
+    { n: "Zuhr",     core: true  },
+    { n: "Asr",      core: true  },
+    { n: "Maghrib",  core: true  },
+    { n: "Isha",     core: true  },
+    { n: "Witr",     core: false }
+  ],
   quotes: [
     "You are bigger than your habits. Make one decision today on your own terms.",
     "An urge is a wave. It rises, peaks and fades away.",

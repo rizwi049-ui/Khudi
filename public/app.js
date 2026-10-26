@@ -49,7 +49,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.
 
 /* ---------- AI helper ---------- */
 function ctx(){const oc=D.chats.filter(c=>c.id!==cur).sort((a,b)=>b.updated-a.updated).slice(0,4).map(c=>c.title+': '+c.msgs.filter(m=>m.role==='user').slice(-2).map(m=>String(m.content).slice(0,100)).join(' / '));const p=D.tasks.filter(t=>!t.done).map(t=>t.t).slice(0,15),s=D.scores.slice(-10).map(x=>`${x.d} ${x.area}:${x.score}/10`),ut=D.urges.filter(x=>Date.now()-x<7*864e5),hrs=ut.map(x=>new Date(x).getHours());
-  return[`Now: ${new Date().toLocaleString('en-GB')}.`,D.start?`Clean streak: ${days()} days (started ${new Date(D.start).toLocaleDateString('en-CA')}).`:'Streak has not started yet.',`Urge/SOS button pressed ${ut.length} times this week${hrs.length?' (hours: '+hrs.join(',')+')':''}.`,D.memory.length?`Long-term memory: ${D.memory.join(' | ')}.`:'',p.length?`Pending tasks: ${p.join('; ')}.`:'',oc.length?`Recent topics from earlier chats: ${oc.join(' | ')}.`:'',s.length?`Recent scores: ${s.join(', ')}.`:''].filter(Boolean).join('\n')}
+  return[`Now: ${new Date().toLocaleString('en-GB')}.`,D.start?`Clean streak: ${days()} days (started ${new Date(D.start).toLocaleDateString('en-CA')}).`:'Streak has not started yet.',`Urge/SOS button pressed ${ut.length} times this week${hrs.length?' (hours: '+hrs.join(',')+')':''}.`,D.memory.length?`Long-term memory: ${D.memory.join(' | ')}.`:'',p.length?`Pending tasks: ${p.join('; ')}.`:'',oc.length?`Recent topics from earlier chats: ${oc.join(' | ')}.`:'',s.length?`Recent scores: ${s.join(', ')}.`:'',nzLine()].filter(Boolean).join('\n')}
 function thread(c){const m=c.msgs.slice(-30);while(m[0]&&m[0].role!=='user')m.shift();return m}
 async function apiRetry(msgs,mode){let err;for(let i=0;i<2;i++){try{return await api(msgs,mode)}catch(e){err=e;if(e===0)throw e;await new Promise(r=>setTimeout(r,1500*(i+1)))}}throw err}
 async function api(messages,mode){
@@ -71,6 +71,7 @@ function drawHome(){
   const box=$('hTasks');box.innerHTML='';const pend=D.tasks.filter(t=>!t.done).slice(0,3);
   if(!pend.length)box.appendChild(el('p','note','No pending tasks. Add some in the Tasks tab or give them to AI!'));
   pend.forEach(t=>{const r=el('div','task');r.append(el('span','chk'),el('span','',t.t));box.appendChild(r)});
+  drawNamaz();drawWkBanner()
 }
 $('allT').onclick=()=>show('tasks');
 $('startS').onclick=()=>{D.start=Date.now();save();drawHome();boom()};
@@ -104,8 +105,9 @@ async function ask(text,title){
   if(!c){c={id:uid(),title:title||mkTitle(text),created:Date.now(),updated:Date.now(),msgs:[]};D.chats.unshift(c);cur=c.id;$('msgs').innerHTML='';drawHead()}
   c.msgs.push({role:'user',content:text});c.updated=Date.now();save();
   bubble('u',text);const out=bubble('a','');out.innerHTML=DOTS;
-  try{const t=await apiRetry(thread(c));c.msgs.push({role:'assistant',content:t});c.updated=Date.now();
-    if(cur===c.id){if(out.isConnected)await type(out,t);else renderChat(true)}
+  try{let t,live=false;try{t=await streamApi(thread(c),out);live=true}catch(e){if(e===0)throw e;t=await apiRetry(thread(c))}
+    c.msgs.push({role:'assistant',content:t});c.updated=Date.now();
+    if(cur===c.id){if(live){if(out.isConnected)out.textContent=t;else renderChat(true)}else if(out.isConnected)await type(out,t);else renderChat(true)}
     save();if(!title&&c.msgs.length===2)makeTitle(c,text)}
   catch(e){c.msgs.pop();
     if(!c.msgs.length){D.chats=D.chats.filter(x=>x!==c);if(cur===c.id){cur=null;drawHead()}}
@@ -167,7 +169,7 @@ $('dSave').onclick=async()=>{const a=areaToday(),score=+$('dRange').value,note=$
   catch(e){$('dReply').textContent=`Your ${score}/10 is saved. Well done!`}};
 
 /* ---------- scores ---------- */
-function drawScore(){drawExtra();const box=$('sc');box.innerHTML='';const S=D.scores;
+function drawScore(){drawExtra();drawNamaz();drawWk();const box=$('sc');box.innerHTML='';const S=D.scores;
   if(!S.length){box.appendChild(el('p','note','No scores yet. The daily question will appear each day.'));return}
   const bars=el('div','bars');S.slice(-14).forEach(s=>{const b=el('div','bar');b.title=s.d+' \u00B7 '+s.area+' \u00B7 '+s.score;const f=el('i');f.style.height=s.score*10+'%';b.append(f,el('span','',s.d.slice(8)));bars.appendChild(b)});box.appendChild(bars);
   const g={};S.forEach(s=>{(g[s.area]=g[s.area]||[]).push(s.score)});
@@ -194,4 +196,67 @@ function drawExtra(){const h=$('hist');if(!h)return;h.innerHTML='';
   D.memory.forEach((t,i)=>{const r=el('div','task'),x=el('button','x','\u00D7');x.onclick=()=>{D.memory.splice(i,1);save();drawExtra()};r.append(el('span','',t),x);m.appendChild(r)})}
 $('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,1)],{type:'application/json'}));a.download='saathi-backup-'+today()+'.json';a.click()};
 $('imp').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());if(confirm('Restore this backup? Current data will be replaced.')){D=Object.assign(D,j);D.updated=Date.now();save();setTimeout(()=>location.reload(),900)}}catch(x){alert('That file is not a valid backup.')}};
+/* ---------- streaming chat (words appear as they are written; falls back to the normal way if it fails) ---------- */
+async function streamApi(messages,out){
+  const r=await fetch('/api/chat-stream',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages,context:ctx()})});
+  if(r.status===401){location.reload();throw 0}
+  if(!r.ok||!r.body)throw new Error('stream unavailable');
+  const rd=r.body.getReader(),dec=new TextDecoder();let buf='',txt='',fin=null;
+  const onData=d=>{let j;try{j=JSON.parse(d)}catch(e){return}
+    if(j.t){txt+=j.t;if(out.isConnected){out.textContent=txt;out.scrollIntoView({block:'end'})}}
+    else if(j.done)fin=j;else if(j.error&&!txt)throw new Error(j.error)};
+  try{for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+      let m;while((m=/\r?\n\r?\n/.exec(buf))){const blk=buf.slice(0,m.index);buf=buf.slice(m.index+m[0].length);blk.split(/\r?\n/).forEach(l=>{if(l.startsWith('data:'))onData(l.slice(5).trim())})}}}
+  catch(e){if(!txt&&!fin)throw e}
+  if(fin){applyActions(fin.actions);return fin.text||txt.trim()}
+  if(!txt)throw new Error('empty reply');
+  return txt.trim()}
+
+/* ---------- namaz tracker ---------- */
+const nzCore=()=>(CONFIG.prayers||[]).filter(p=>p.core);
+const nzDay=k=>{D.namaz=D.namaz||{};return D.namaz[k||today()]||[]};
+const nzCount=k=>{const c=nzCore();return nzDay(k).filter(n=>c.some(p=>p.n===n)).length};
+const dayKey=back=>{const d=new Date();d.setDate(d.getDate()-back);return d.toLocaleDateString('en-CA')};
+function nzStreak(){const n=nzCore().length;if(!n)return 0;let i=nzCount(dayKey(0))>=n?0:1,s=0;while(i<400&&nzCount(dayKey(i))>=n){s++;i++}return s}
+function nzLine(){const c=nzCore();if(!c.length)return'';const wk=[];for(let i=6;i>=0;i--)wk.push(nzCount(dayKey(i)));
+  return`Namaz today: ${nzDay().join(', ')||'none ticked yet'} (${nzCount()}/${c.length} main). Main prayers per day, last 7 days (oldest first): ${wk.join(',')} out of ${c.length}.`}
+function nzToggle(n){const k=today();D.namaz=D.namaz||{};const a=D.namaz[k]||(D.namaz[k]=[]),i=a.indexOf(n);
+  if(i>-1)a.splice(i,1);else{a.push(n);if(nzCore().some(p=>p.n===n)&&nzCount(k)>=nzCore().length)boom()}
+  const ks=Object.keys(D.namaz).sort();while(ks.length>120)delete D.namaz[ks.shift()];
+  save();drawNamaz()}
+function drawNamaz(){const P=CONFIG.prayers||[],box=$('nzList');if(!box)return;$('nzCard').classList.toggle('hide',!P.length);if(!P.length)return;
+  const core=nzCore(),done=nzDay(),s=nzStreak();
+  $('nzNote').textContent=`${nzCount()} of ${core.length} main prayers today`+(s>=2?` \u00B7 ${s}-day streak`:'');
+  box.innerHTML='';
+  P.forEach(p=>{const on=done.includes(p.n),r=el('div','task'),c=el('button','chk'+(on?' on':''));c.setAttribute('aria-label',p.n);c.onclick=()=>nzToggle(p.n);
+    r.append(c,el('span','',p.n));if(!p.core)r.appendChild(el('span','tag','extra'));box.appendChild(r)});
+  const w=$('nz7');if(!w)return;w.innerHTML='';const bars=el('div','bars');let tot=0;
+  for(let i=6;i>=0;i--){const k=dayKey(i),c=nzCount(k);tot+=c;const b=el('div','bar');b.title=k+' \u00B7 '+c+'/'+core.length;const f=el('i');f.style.height=(core.length?c/core.length*100:0)+'%';b.append(f,el('span','',k.slice(8)));bars.appendChild(b)}
+  w.appendChild(bars);$('nz7note').textContent=`${tot} of ${core.length*7} main prayers in the last 7 days. Missed one? Pray qaza when you can and keep going.`}
+
+/* ---------- weekly review ---------- */
+const wkLast=()=>{const w=D.weekly||[];return w[w.length-1]||null};
+function wkDue(){const l=wkLast();if(l&&l.d===today())return false;
+  if(!(D.scores||[]).length&&!Object.keys(D.namaz||{}).length)return false;
+  if(new Date().getDay()===0)return true;
+  if(!l)return D.scores.length>=3;
+  return Date.now()-new Date(l.d).getTime()>=8*864e5}
+function drawWkBanner(){const b=$('wkBanner');if(b)b.classList.toggle('hide',!wkDue())}
+function wkPrompt(){const rows=[];
+  for(let i=6;i>=0;i--){const k=dayKey(i),sc=(D.scores||[]).filter(x=>x.d===k).map(x=>`${x.area} ${x.score}/10`).join(', ')||'no check-in',
+    ur=(D.urges||[]).filter(u=>new Date(u).toLocaleDateString('en-CA')===k).length;
+    rows.push(`${k}: ${sc}; urge button ${ur}x; namaz ${nzCount(k)}/${nzCore().length||5}`)}
+  return `Mera weekly review banao. Pichle 7 din ka data:\n${rows.join('\n')}\nClean streak: ${days()} din. Pending tasks: ${D.tasks.filter(t=>!t.done).length}.\nFormat: 1) is hafte ki sabse achhi baat, 2) ek pattern jo data mein nazar aaya (urge ke waqt, scores, namaz), 3) ek kamzori bina sharminda kiye, 4) agle hafte ke liye sirf 2 chhote targets. Aakhir mein ek sawal. Maximum 220 lafz.`}
+function drawWk(){const box=$('wkText');if(!box)return;box.innerHTML='';const W=[...(D.weekly||[])].reverse();
+  $('wkNote').textContent=W.length?'Last review: '+W[0].d:'Saathi looks at your last 7 days and gives you a short review.';
+  W.forEach((w,i)=>{if(i===0)box.appendChild(el('div','wk',w.text));else{const dt=el('details','wkold');dt.appendChild(el('summary','',w.d));dt.appendChild(el('div','wk',w.text));box.appendChild(dt)}});
+  $('wkChat').classList.toggle('hide',!W.length);
+  if(!$('wkBtn').disabled)$('wkBtn').textContent=W.length&&W[0].d===today()?'Make it again':"Make this week's review"}
+$('wkBtn').onclick=async()=>{const b=$('wkBtn');b.disabled=true;b.textContent='Saathi is thinking...';
+  try{const t=await apiRetry([{role:'user',content:wkPrompt()}]);const w=D.weekly=D.weekly||[];if(w.length&&w[w.length-1].d===today())w.pop();w.push({d:today(),text:t});D.weekly=w.slice(-8);save();boom()}
+  catch(e){if(e!==0)alert('Could not make the review. Please try again.')}
+  b.disabled=false;drawWk();drawWkBanner()};
+$('wkChat').onclick=()=>{const l=wkLast();if(!l)return;const c={id:uid(),title:'Weekly review',created:Date.now(),updated:Date.now(),msgs:[{role:'user',content:'Weekly review '+l.d},{role:'assistant',content:l.text}]};D.chats.unshift(c);save();openChat(c.id)};
+$('wkOpen').onclick=()=>{show('score');setTimeout(()=>$('wkCard').scrollIntoView({behavior:'smooth'}),60)};
+
 boot();

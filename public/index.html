@@ -35,6 +35,8 @@
       <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn light" id="startS">Start streak</button><button class="btn light hide" id="reset">Fresh start</button></div>
     </div>
     <button class="btn sos" id="urge">I have an urge right now</button>
+    <div class="card c3 hide" id="wkBanner"><h2>Your weekly review is ready</h2><p class="note">See how your week went and pick two small goals.</p><button class="btn" id="wkOpen" style="width:100%">Open review</button></div>
+    <div class="card c3" id="nzCard"><h2>Today's namaz</h2><p class="note" id="nzNote"></p><div id="nzList"></div></div>
     <div class="card c2"><h2>Today's tasks</h2><div id="hTasks"></div><button class="lnk" id="allT">See all tasks &rarr;</button></div>
     <div class="card c3"><h2>Milestones</h2><div class="badges" id="badges"></div></div>
   </section>
@@ -57,6 +59,10 @@
 
   <section id="v-score" class="hide">
     <div class="card c3"><h2>My progress</h2><p class="note">Your daily check-in scores</p><div id="sc"></div></div>
+    <div class="card c2"><h2>Namaz this week</h2><p class="note" id="nz7note"></p><div id="nz7"></div></div>
+    <div class="card c3" id="wkCard"><h2>Weekly review</h2><p class="note" id="wkNote"></p><div id="wkText"></div>
+      <button class="btn" id="wkBtn" style="width:100%">Make this week's review</button>
+      <button class="btn ghost hide" id="wkChat" style="width:100%;margin-top:8px">Talk about it in chat</button></div>
     <div class="card"><h2>Saathi's memory</h2><p class="note">What Saathi has remembered about you</p><div id="mem"></div></div>
     <div class="card"><h2>Daily log</h2><div id="hist"></div></div>
     <div class="card"><h2>Backup</h2><div style="display:flex;gap:8px"><button class="btn ghost" id="exp" style="flex:1">Download</button><label class="btn ghost" style="flex:1;text-align:center">Restore<input id="imp" type="file" accept=".json" hidden></label></div></div>
